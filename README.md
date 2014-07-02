@@ -1,9 +1,5 @@
 #dam
-===
-
-Digital Asset Managment done right.
-
-Currently being developed on Windows but will be able to work for Windows, Linux, OSX.
+Digital Asset Managment done right. Currently being developed on Windows but will be able to work for Windows, Linux, OSX.
 
 ##Contribute
 Have a better way to implement this? Contact me @arduinology on Twitter or create an issue here.
