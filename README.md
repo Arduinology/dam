@@ -9,5 +9,7 @@ PyCharm - http://www.jetbrains.com/pycharm/
 
 ##Dependencies
 PySide - http://qt-project.org/wiki/Category:LanguageBindings::PySide::Downloads
+
 Python For Windows - http://sourceforge.net/projects/pywin32/files/pywin32/
+
 Python 2.7
