@@ -5,6 +5,11 @@ import sys
 from PySide.QtCore import *
 from PySide.QtGui import *
 from PySide.QtDeclarative import QDeclarativeView
+from whoosh.index import create_in
+from whoosh.fields import *
+from whoosh.qparser import QueryParser
+from whoosh.qparser import FuzzyTermPlugin
+from whoosh.analysis import NgramAnalyzer
 
 from pprint import pprint
 
@@ -15,15 +20,23 @@ import pymongo
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 
-client = MongoClient('localhost', 27017)
+# Whoosh
+schema = Schema(Filename=TEXT(analyzer=NgramAnalyzer(2)),
+                File_description=TEXT(stored=True, analyzer=NgramAnalyzer(2)),
+                Date_created=TEXT(stored=True, analyzer=NgramAnalyzer(2)))
+ix = create_in("indexdir", schema)
+writer = ix.writer()
 
+
+# Database
+client = MongoClient('localhost', 27017)
 db = client.test_database
 posts = db.posts
 posts.drop()
 
 import datetime
-post = {}
 
+post = {}
 
 
 class Main(QWidget):
@@ -44,10 +57,10 @@ class Main(QWidget):
         # ######## User Input *QLineEdit*
         fileSearch = QLineEdit(self)
         fileSearch.setFont(QFont('SansSerif', 20))
-        fileSearch.setGeometry(0, 0, uiWidth-padding, 25)
+        fileSearch.setGeometry(0, 0, uiWidth - padding, 25)
         fsWidth = (uiWidth - fileSearch.width()) / 2
-        fileSearch.setGeometry(fsWidth, 10, uiWidth-padding, 35)
-        self.list.setGeometry(fsWidth, 50, uiWidth-padding, 200)
+        fileSearch.setGeometry(fsWidth, 10, uiWidth - padding, 35)
+        self.list.setGeometry(fsWidth, 50, uiWidth - padding, 200)
         fileSearch.textChanged.connect(self.onChanged)
 
         self.move((QApplication.desktop().availableGeometry().center().x() - self.rect().center().x()), 0)
@@ -56,7 +69,7 @@ class Main(QWidget):
         label.setAlignment(Qt.AlignBottom | Qt.AlignLeft)
 
         sh = win32com.client.gencache.EnsureDispatch('Shell.Application', 0)
-        ns = sh.NameSpace(r'C:\Dropbox\External\Video Tutorials')
+        ns = sh.NameSpace(r'C:')
         column = 0
         columns = []
         while True:
@@ -75,8 +88,17 @@ class Main(QWidget):
                     post[columns[column]] = colval
                     post['_id'] = o
                     label.setText(label.text() + "\n" + columns[column] + " | " + colval)
-            pprint(post)
+            if 'File description' not in post:
+                post['File description'] = ''
+            if 'Date created' not in post:
+                post['Date created'] = ''
+            writer.add_document(Filename=post['Filename'],
+                                File_description=post['File description'],
+                                Date_created=post['Date created'])
+            pprint(post['Filename'])
             post_id = posts.insert(post)
+
+        writer.commit()
 
         # MainFrameLayout.addWidget(label)
 
@@ -86,17 +108,19 @@ class Main(QWidget):
 
     def onChanged(self, text):
         self.list.clear()
-        items = list(posts.find({"Name":{"$regex": text}}))
+        items = list(posts.find({"Name": {"$regex": text}}))
         # pprint(items)
         i = 0
         for item in items:
-
             test = "test"
             listItem = QListWidgetItem()
             listItem.setText(item['Name'])
             self.list.addItem(listItem)
-            print(item['Name'])
-            i+=1
+            i += 1
+        with ix.searcher() as searcher:
+            query = QueryParser("Filename", ix.schema).parse(text)
+            results = searcher.search(query)
+            print(results[0])
 
 
 def main():
