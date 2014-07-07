@@ -1,29 +1,25 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import sys
-from PySide.QtCore import *
-from PySide.QtGui import *
-from PySide.QtDeclarative import QDeclarativeView
+from pprint import pprint
+
 from whoosh.index import create_in
 from whoosh.fields import *
 from whoosh.qparser import QueryParser
-from whoosh.qparser import FuzzyTermPlugin
 from whoosh.analysis import NgramAnalyzer
-
-from pprint import pprint
-
 import win32com
 import win32com.client
-
-import pymongo
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 
+from PySide.QtCore import *
+from PySide.QtGui import *
+
+
 # Whoosh
-schema = Schema(Filename=TEXT(analyzer=NgramAnalyzer(2)),
-                File_description=TEXT(stored=True, analyzer=NgramAnalyzer(2)),
-                Date_created=TEXT(stored=True, analyzer=NgramAnalyzer(2)))
+schema = Schema(Filename=TEXT(stored=True, analyzer=NgramAnalyzer(1)),
+                File_description=TEXT(stored=True, analyzer=NgramAnalyzer(1)),
+                Date_created=TEXT(stored=True, analyzer=NgramAnalyzer(1)))
 ix = create_in("indexdir", schema)
 writer = ix.writer()
 
@@ -33,8 +29,6 @@ client = MongoClient('localhost', 27017)
 db = client.test_database
 posts = db.posts
 posts.drop()
-
-import datetime
 
 post = {}
 
@@ -109,23 +103,64 @@ class Main(QWidget):
     def onChanged(self, text):
         self.list.clear()
         items = list(posts.find({"Name": {"$regex": text}}))
-        # pprint(items)
-        i = 0
-        for item in items:
-            test = "test"
-            listItem = QListWidgetItem()
-            listItem.setText(item['Name'])
-            self.list.addItem(listItem)
-            i += 1
         with ix.searcher() as searcher:
             query = QueryParser("Filename", ix.schema).parse(text)
             results = searcher.search(query)
-            print(results[0])
+            for result in results:
+                listItem = QListWidgetItem()
+                listItem.setText(result['Filename'])
+                self.list.addItem(listItem)
+                self.createListItem(self)
 
+    def createListItem(self, qwidget):
+        print("a")
+        delegate = QItemDelegate()
+
+
+class resultDelegate(QItemDelegate):
+    def __init__(self, parent = None):
+        QItemDelegate.__init__(self, parent)
+
+    def createEditor(self, parent, option, index):
+        editor = QSpinBox(parent)
+        editor.setMinimum(0)
+        editor.setMaximum(5)
+        editor.installEventFilter(self)
+
+        return editor
+
+    def setEditorData(self, spinBox, index):
+        value = index.model().data(index, Qt.DisplayRole)
+        spinBox.setValue(value)
+
+    def setModelData(self, spinBox, model, index):
+        spinBox.interpretText()
+        value = spinBox.value()
+
+        model.setData(index, value)
+
+    def updateEditorGeometry(self, editor, option, index):
+        editor.setGeometry(option.rect)
 
 def main():
     app = QApplication(sys.argv)
-    main = Main()
+
+    model = QStandardItemModel(4, 2)
+    model.setHorizontalHeaderLabels(["Icon", "File Info"])
+    tableView = QTableView()
+    tableView.setModel(model)
+
+    delegate = resultDelegate()
+    tableView.setItemDelegate(delegate)
+
+    for row in range (4):
+        for column in range(2):
+            index = model.index(row, column, QModelIndex())
+            model.setData(index, (row+1) * (column+1))
+
+    tableView.setWindowTitle("test")
+    tableView.show()
+    # main = Main()
     sys.exit(app.exec_())
 
 
